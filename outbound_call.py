@@ -11,8 +11,8 @@ auth_token = os.getenv("TWILIO_AUTH_TOKEN")
 account_sid = os.getenv("TWILIO_ACCOUNT_SID")
 from_number = os.getenv("TWILIO_PHONE_NUMBER")
 to_number = os.getenv("MY_PHONE_NUMBER")
+other_number = os.getenv("OTHER_PHONE_NUMBER")
 client = Client(account_sid, auth_token)
-other_number = "+966541389019"
 
 # Fetch the server URL (e.g. ngrok) from env or use a placeholder
 # You must have "SERVER_URL" in your .env.local, e.g. SERVER_URL=https://xxxx.ngrok.io
@@ -24,7 +24,7 @@ if not server_url:
 
 call = client.calls.create(
     url=f"{server_url}/twiml",
-    to=to_number,
+    to=to_number ,
     from_=from_number,
 )
 
