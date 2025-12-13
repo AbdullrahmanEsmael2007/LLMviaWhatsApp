@@ -1,4 +1,4 @@
-# LLM via WhatsApp - Codebase Explanation
+# LLM via Voicecall - Codebase Explanation
 
 > A real-time AI voice assistant application that bridges Twilio phone calls with OpenAI's Realtime API, enabling users to have voice conversations with an AI chatbot over the phone.
 
