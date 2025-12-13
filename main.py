@@ -1,10 +1,24 @@
 from fastapi import FastAPI
 from app.config import PORT
-from app.api import router
+from app.routers.whatsapp import router as whatsapp_router
+from app.routers.voice import router as voice_router
 
-app = FastAPI()
+app = FastAPI(title="Unified LLM Server (WhatsApp & Voice)")
 
-app.include_router(router)
+# Register Routers
+app.include_router(whatsapp_router) # Handles /whatsapp
+app.include_router(voice_router)    # Handles /twiml and /websocket
+
+@app.get("/")
+async def root():
+    return {
+        "message": "Unified Server Running",
+        "endpoints": {
+            "whatsapp": "POST /whatsapp",
+            "voice_webhook": "POST /twiml",
+            "voice_websocket": "WSS /websocket"
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,3 +1,4 @@
 .env.local
 ngrok-whatsapp.yml
 send_message.py
+__pycache__

@@ -1,12 +1,9 @@
 from fastapi import APIRouter, Request, Form, Response
 from twilio.twiml.messaging_response import MessagingResponse
-from app.chat_service import get_chat_response
+# Import form the new services location (we will move chat_service.py next)
+from app.services.chat_service import get_chat_response
 
 router = APIRouter()
-
-@router.get("/")
-async def index_page():
-    return "<h1>WhatsApp Bot Server is Running</h1>"
 
 @router.post("/whatsapp")
 async def whatsapp_reply(

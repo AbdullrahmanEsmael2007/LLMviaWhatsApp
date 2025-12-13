@@ -76,8 +76,8 @@ Description=Ngrok Tunnel
 After=network.target
 
 [Service]
-User=azureuser
-Group=azureuser
+User=livekitserver
+Group=livekitserver
 WorkingDirectory=/opt/llm-voice
 
 # Command to start ngrok on port 5050
