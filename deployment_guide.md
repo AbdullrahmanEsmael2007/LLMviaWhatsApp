@@ -1,45 +1,95 @@
-# Deployment & Maintenance Guide (Azure/Linux)
+# Azure Hosting & Deployment Guide
 
-This guide explains how to set up `uvicorn` (the app) and `ngrok` (the tunnel) as background services so they start automatically and stay running.
+This guide covers everything from setting up a fresh Azure server to keeping your application running 24/7.
 
-## Prerequisites
+## Phase 1: Initial Server Setup (From Scratch)
 
-*   **Server Path**: Assumed to be `/opt/llm-voice`. Adjust if different.
-*   **User**: Assumed to be the current user (e.g., `azureuser` or `ubuntu`).
-*   **Virtual Environment**: Located at `/opt/llm-voice/venv`.
+This section assumes you have a brand new **Ubuntu** server on Azure and have just logged in via SSH.
+
+### 1. The Golden Rule of Ports
+To ensure compatibility with other projects on the same server, **we must pick a unique port**.
+
+1.  **Check used ports**: Run this to see what is already in use.
+    ```bash
+    sudo ss -tulpn | grep LISTEN
+    ```
+2.  **Pick your port**: The default is `5050`. If `5050` is taken, pick another (e.g., `5051`, `8000`, `3000`).
+3.  **Open Firewall**: You must allow this port in your **Azure Network Security Group (NSG)**.
+    *   Go to Azure Portal -> Compute -> Networking -> Add Inbound Rule -> Destination Port Ranges: `5050` (or your choice).
+
+### 2. System Preparation
+Update the system and install necessary tools:
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y python3 python3-pip python3-venv git
+```
+
+### 3. Clone & Setup
+We install the app in `/opt` (standard for optional software).
+
+```bash
+# 1. Navigate to /opt
+cd /opt
+
+# 2. Clone the repo
+sudo git clone https://github.com/AbdullrahmanEsmael2007/LLMviaCall.git llm-voice
+
+# 3. Give your user ownership (replace 'azureuser' if different)
+sudo chown -R azureuser:azureuser llm-voice
+
+# 4. Enter directory
+cd llm-voice
+```
+
+### 4. Virtual Environment & Dependencies
+```bash
+# 1. Create venv
+python3 -m venv venv
+
+# 2. Activate it
+source venv/bin/activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+```
+
+### 5. Configuration (.env)
+Create the configuration file:
+```bash
+nano .env
+```
+Paste your keys (ensure PORT matches what you picked in Step 1):
+```ini
+OPENAI_API_KEY=sk-...
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+PORT=5050 
+```
+*(Save: Ctrl+X, Y, Enter)*
 
 ---
 
-## 1. Setting up the App Service (`llm-voice`)
+## Phase 2: Running as a Service (Systemd)
 
-We will use `systemd` to keep the Python server running.
+We use `systemd` to keep the app running in the background.
 
-### 1.1 Create the Service File
-Run: `sudo nano /etc/systemd/system/llm-voice.service`
+### 1. App Service (`llm-voice`)
 
-Paste this content (adjusting User/Group/Paths as needed):
-
+**1. Create Service File**: `sudo nano /etc/systemd/system/llm-voice.service`
 ```ini
 [Unit]
-Description=LLM Voice Assistant (Uvicorn)
+Description=LLM Voice Assistant
 After=network.target
 
 [Service]
-# CHANGE THESE TO YOUR USERNAME/GROUP
 User=azureuser
 Group=azureuser
-
-# The directory where your code lives
 WorkingDirectory=/opt/llm-voice
-
-# Environment variables (or use EnvironmentFile=/opt/llm-voice/.env)
 EnvironmentFile=/opt/llm-voice/.env
 Environment="PATH=/opt/llm-voice/venv/bin"
+# Port is loaded from .env automatically
+ExecStart=/opt/llm-voice/venv/bin/uvicorn main:app --host 0.0.0.0
 
-# The command to start the server
-ExecStart=/opt/llm-voice/venv/bin/uvicorn main:app --host 0.0.0.0 --port 5050
-
-# Auto-restart if it crashes
 Restart=always
 RestartSec=3
 
@@ -47,42 +97,30 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-### 1.2 Enable and Start
+**2. Enable and Start**:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable llm-voice
 sudo systemctl start llm-voice
 ```
 
-### 1.3 Check Status
-```bash
-sudo systemctl status llm-voice
-```
+**3. Check Status**: `sudo systemctl status llm-voice`
 
----
+### 2. Ngrok Service (Optional)
 
-## 2. Setting up Ngrok Service (`ngrok`)
+If you chose NOT to open ports in Azure or want a public HTTPS URL easily.
 
-Running ngrok as a service ensures the tunnel stays open.
-
-> **Important**: If you are on the **Free Tier**, your URL changes every time ngrok restarts. You must update the Twilio Console manually each time. We highly recommend a paid plan or a static domain if possible.
-
-### 2.1 Create the Service File
-Run: `sudo nano /etc/systemd/system/ngrok.service`
-
+**1. Create Service File**: `sudo nano /etc/systemd/system/ngrok.service`
 ```ini
 [Unit]
 Description=Ngrok Tunnel
 After=network.target
 
 [Service]
-User=livekitserver
-Group=livekitserver
+User=azureuser
+Group=azureuser
 WorkingDirectory=/opt/llm-voice
-
-# Command to start ngrok on port 5050
-# If you have a config file, add: --config=/opt/llm-voice/ngrok.yml
-# If you have a static domain, add: --domain=your-domain.ngrok-free.app
+# Replace with your actual config file path or token
 ExecStart=/usr/local/bin/ngrok http 5050 --log=stdout
 
 Restart=always
@@ -92,54 +130,35 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-### 2.2 Enable and Start
+**2. Enable and Start**:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable ngrok
 sudo systemctl start ngrok
 ```
 
-### 2.3 Get the Public URL
-To see the URL assigned by ngrok:
+**3. Get Public URL**:
 ```bash
-curl http://localhost:4040/api/tunnels | python3 -c "import sys, json; print(json.load(sys.stdin)['tunnels'][0]['public_url'])"
+curl http://localhost:4040/api/tunnels
 ```
-*Copy this URL to your Twilio Console.*
 
 ---
 
-## 3. Maintenance Cheat Sheet
+## Phase 3: Maintenance & Updates
 
-### Restarting the App (After code changes)
-Whenever you `git pull` new code, you must restart the app:
+### Restarting after Code Changes
+Whenever you update code (`git pull`), you must restart the service.
+
 ```bash
-# 1. Pull changes
 cd /opt/llm-voice
 git pull
-
-# 2. Update dependencies (Optional, if requirements.txt changed)
 source venv/bin/activate
-pip install -r requirements.txt
-
-# 3. Restart Service
+pip install -r requirements.txt  # If requirements changed
 sudo systemctl restart llm-voice
 ```
 
-### Restarting Ngrok
-```bash
-sudo systemctl restart ngrok
-# Remember to check the new URL if you don't have a static domain!
-```
+### Debugging Logs
+If something is wrong, check the live logs:
 
-### Viewing Logs (Debugging)
-If something isn't working, check the logs:
-
-**App Logs:**
-```bash
-sudo journalctl -u llm-voice -f
-```
-
-**Ngrok Logs:**
-```bash
-sudo journalctl -u ngrok -f
-```
+*   **App Logs**: `sudo journalctl -u llm-voice -f`
+*   **Ngrok Logs**: `sudo journalctl -u ngrok -f`
