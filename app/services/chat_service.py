@@ -4,6 +4,7 @@ import json
 import base64
 import io
 import asyncio
+from collections import defaultdict
 from app.config import OPENAI_API_KEY, WHATSAPP_SYSTEM_MESSAGE, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
 from typing import Optional, Tuple
 from app.services.rag_client import RagClient
