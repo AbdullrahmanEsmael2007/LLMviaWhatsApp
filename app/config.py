@@ -42,3 +42,8 @@ RAG_API_BASE_URL = os.getenv('RAG_API_BASE_URL', 'https://40-79-241-100.sslip.io
 RAG_EMAIL = os.getenv('RAG_EMAIL', 'admin@rmg-sa.com')
 RAG_PASSWORD = os.getenv('RAG_PASSWORD', 'Admin@123456')
 RAG_SESSION_ID = os.getenv('RAG_SESSION_ID', '54e7d7fa-4496-43c0-88f5-9ceea5bf4eb5')
+
+# Audio Configuration
+# Base64 string for "Let me check that..." + Typing sounds. 
+# Leave empty to disable filler audio.
+FILLER_AUDIO = os.getenv('FILLER_AUDIO', '')

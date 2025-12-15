@@ -75,20 +75,25 @@ class VoiceEventHandler:
     async def send_filler_audio(self):
         """
         Send a 'typing sound' or 'filler phrase' to Twilio to mask RAG latency.
-        TODO: Replace with actual base64 audio of 'Let me check that...' + typing sounds.
         """
         if not self.stream_sid:
             return
-
-        # Ideally, load this from a file or config
-        # For now, we will print a log placeholder. 
-        # To make this real, you would do:
-        # await self.websocket.send_json({
-        #     "event": "media",
-        #     "streamSid": self.stream_sid,
-        #     "media": {"payload": "BASE64_AUDIO_STRING"}
-        # })
-        print(">> PLAYING FILLER AUDIO: 'Let me look that up for you...' [Typing Sounds] <<")
+            
+        from app.config import FILLER_AUDIO
+        
+        if FILLER_AUDIO:
+            # print(">> PLAYING FILLER AUDIO: 'Let me look that up for you...' [Typing Sounds] <<")
+            try:
+                await self.websocket.send_json({
+                    "event": "media",
+                    "streamSid": self.stream_sid,
+                    "media": {"payload": FILLER_AUDIO}
+                })
+            except Exception as e:
+                print(f"Error sending filler audio: {e}")
+        else:
+            # print(">> Filler audio requested but FILLER_AUDIO config is empty. Skipping. <<")
+            pass
 
     async def receive_from_twilio(self):
         """Receive audio from Twilio and send to OpenAI."""
