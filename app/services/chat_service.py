@@ -37,7 +37,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "query_knowledge_base",
-            "description": "Use this tool to answer specific questions about files, documents, or company knowledge/data.",
+            "description": "Use this tool to answer specific questions about files, documents, business rules, requirements, fees, or company data. If the user asks for specific values or procedures, ALWAYS use this tool.",
             "parameters": {
                 "type": "object",
                 "properties": {
