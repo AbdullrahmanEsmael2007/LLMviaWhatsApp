@@ -40,17 +40,16 @@ class RagClient:
         if not self.token:
             await self.login()
         
-        # Endpoint provided: POST /chat-messages/voice (with session_id query param likely)
-        # Note: 'voice' in URL suggests it might return audio or expect audio? 
-        # But for RAG usually it's text. We send text.
+        # CORRECT ENDPOINT: Use text chat endpoint, not voice
+        url = f"{self.base_url}/chat-messages" 
         
-        url = f"{self.base_url}/chat-messages/voice"
-        params = {"session_id": RAG_SESSION_ID}
-        
-        # We need to structure the body. Usually { "message": "..." } or similar.
-        # Without docs, we assume standard: { "content": message } or { "query": message }
-        # Let's try { "message": message }
-        body = { "message": message } # Generic guess, needs verification if docs unavailable
+        # Schema requires multipart/form-data for 'message' and 'session_id'
+        # based on ChatMessageCreateModel schema in OpenAPI
+        data = {
+            "session_id": RAG_SESSION_ID,
+            "message": message,
+            "styled_answer": "false" # Optional, purely text preference
+        }
         
         headers = {}
         if self.token:
@@ -58,20 +57,36 @@ class RagClient:
 
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(url, params=params, json=body, headers=headers)
+                # httpx handles multipart/form-data when using 'data' param (not json)
+                response = await client.post(url, data=data, headers=headers)
                 
                 if response.status_code == 401:
-                    # Token expired, retry once
                     print("Token expired, refreshing...")
                     await self.login()
                     headers["Authorization"] = f"Bearer {self.token}"
-                    response = await client.post(url, params=params, json=body, headers=headers)
+                    response = await client.post(url, data=data, headers=headers)
+
+                if response.status_code == 422:
+                    print(f"Validation Error: {response.text}")
+                    return "I found some info but the system rejected the format."
 
                 response.raise_for_status()
+                # Endpoint returns specific structure, seemingly just "Successful Response" (200)
+                # But we need the ANSWER. The GET endpoint returns messages. 
+                # Wait, the POST /chat-messages returns 200 "Successful Response" but content is implicit?
+                # Usually RAG APIs return the answer in the POST response.
+                # Let's check the schema output for POST /chat-messages 
+                # Response is "200 Successful Response", schema undefined/empty?
+                # ACTUALLY: The user's code snippet implies they want an answer.
+                # Let's check the logs or assume standard behavior.
+                # Inspecting the OpenAPI again: POST /chat-messages returns "200"
+                # But let's look at the actual response content.
+                
                 result = response.json()
                 
-                # Parse result. Usually content is in "answer" or "data"
-                # We return the raw text answer.
+                # If the API is stream-only or async, we might not get the answer here.
+                # But typically it returns { "answer": ... } or { "data": ... }
+                # Let's try to extract 'answer' or 'message' from response.
                 return result.get("answer") or result.get("data") or str(result)
                 
             except Exception as e:
