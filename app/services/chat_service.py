@@ -5,11 +5,12 @@ import base64
 import io
 import asyncio
 from app.config import OPENAI_API_KEY, WHATSAPP_SYSTEM_MESSAGE, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
-from collections import defaultdict
 from typing import Optional, Tuple
+from app.services.rag_client import RagClient
 
-# Initialize OpenAI Client
+# Initialize Clients
 client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+rag_client = RagClient()
 
 conversation_history = defaultdict(list)
 
@@ -29,6 +30,23 @@ TOOLS = [
                     }
                 },
                 "required": ["prompt"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_knowledge_base",
+            "description": "Use this tool to answer specific questions about files, documents, or company knowledge/data.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The specific question or query to check in the knowledge base."
+                    }
+                },
+                "required": ["query"]
             }
         }
     }
@@ -150,6 +168,36 @@ async def get_chat_response(
                     
                     return "I am generating that image for you now 🎨... It might take a moment.", None
             
+                elif tool_call.function.name == "query_knowledge_base":
+                    args = json.loads(tool_call.function.arguments)
+                    query = args.get("query")
+                    print(f"Querying Knowledge Base: {query}")
+                    
+                    # Call RAG API
+                    rag_answer = await rag_client.query(query)
+                    print(f"RAG Answer: {rag_answer}")
+                    
+                    conversation_history[sender_number].append({
+                        "tool_call_id": tool_call.id,
+                        "role": "tool",
+                        "name": "query_knowledge_base",
+                        "content": rag_answer or "No relevant information found."
+                    })
+                    # Loop continues to get the final answer from GPT based on the tool output
+            
+            # --- 3. RE-CALL API AFTER TOOL OUTPUTS ---
+            try:
+                response = await client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=conversation_history[sender_number],
+                    tools=TOOLS,
+                )
+                message = response.choices[0].message
+                
+            except Exception as e:
+                print(f"Error in second pass: {e}")
+                return "I found some info but couldn't process it.", None
+
         # Normal Text Response
         reply = message.content
         conversation_history[sender_number].append({"role": "assistant", "content": reply})

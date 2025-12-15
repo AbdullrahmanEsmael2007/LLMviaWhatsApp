@@ -106,14 +106,19 @@ sudo systemctl start llm-voice
 
 **3. Check Status**: `sudo systemctl status llm-voice`
 
-### 2. Ngrok Service (Optional)
+### 2. Ngrok Service (Using Config File)
 
-If you chose NOT to open ports in Azure or want a public HTTPS URL easily.
+Using a configuration file is cleaner than global commands and keeps your token private.
 
-**1. Authenticate Ngrok** (One-time setup):
-You must do this, or ngrok will fail to start.
-```bash
-/usr/local/bin/ngrok config add-authtoken YOUR_AUTH_TOKEN
+**1. Create Config File**: `nano /opt/llm-voice/ngrok.yml`
+Paste the following (Replace `YOUR_TOKEN_HERE`):
+```yaml
+version: "2"
+authtoken: YOUR_TOKEN_HERE
+tunnels:
+  llm-voice:
+    proto: http
+    addr: 5050
 ```
 
 **2. Create Service File**: `sudo nano /etc/systemd/system/ngrok.service`
@@ -126,8 +131,9 @@ After=network.target
 User=azureuser
 Group=azureuser
 WorkingDirectory=/opt/llm-voice
-# Replace with your actual config file path or token
-ExecStart=/usr/local/bin/ngrok http 5050 --log=stdout
+
+# Point to the config file we just created
+ExecStart=/usr/local/bin/ngrok start --all --config=/opt/llm-voice/ngrok.yml --log=stdout
 
 Restart=always
 RestartSec=3
