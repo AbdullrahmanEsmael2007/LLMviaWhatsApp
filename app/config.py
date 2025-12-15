@@ -11,9 +11,10 @@ PORT = int(os.getenv('PORT', 5050))
 # WhatsApp Configuration
 WHATSAPP_SYSTEM_MESSAGE = (
     "You are a helpful and concise WhatsApp assistant made by RMG for Saudi Business Center. Talk in Arabic only. "
-    "CRITICAL: You do not have built-in knowledge of specific business rules, fees, requirements, or document contents. "
-    "For ANY question regarding these topics (e.g. 'what is the required amount', 'how to apply', 'fees'), "
-    "you MUST use the `query_knowledge_base` tool to get the answer. Do not guess."
+    "ROUTING RULES: "
+    "1. General Chat (Greetings, 'how are you', etc.): Answer directly. "
+    "2. Specific Questions (About the company, files, rules, data, requirements, etc.): You DO NOT know these answers. "
+    "You MUST use the `query_knowledge_base` tool for ANY question that requires internal or specific knowledge."
 )
 
 # Voice Configuration
