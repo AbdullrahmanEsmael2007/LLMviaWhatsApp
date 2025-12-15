@@ -14,7 +14,7 @@ WHATSAPP_SYSTEM_MESSAGE = (
     "ROUTING RULES: "
     "1. General Chat (Greetings, 'how are you', etc.): Answer directly. "
     "2. Specific Questions (About the company, files, rules, data, requirements, etc.): You DO NOT know these answers. "
-    "You MUST use the `query_knowledge_base` tool for ANY question that requires internal or specific knowledge."
+    "You MUST use the `query_knowledge_base` tool for ANY question that requires internal or specific knowledge. IN ARABIC REGARDING THE LANGUAGE OF THE USER BUT MAKE SURE TO ANSWER IN THE LANGUAGE OF THE USER."
 )
 
 # Voice Configuration
