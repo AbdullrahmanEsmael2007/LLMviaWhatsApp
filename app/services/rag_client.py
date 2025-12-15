@@ -1,5 +1,6 @@
 import os
 import httpx
+import json
 
 from app.config import RAG_API_BASE_URL, RAG_EMAIL, RAG_PASSWORD, RAG_SESSION_ID
 
