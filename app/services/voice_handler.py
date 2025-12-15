@@ -62,18 +62,33 @@ class VoiceEventHandler:
                 "streamSid": self.stream_sid
             }
             await self.websocket.send_json(clear_event)
-            print("Sent clear event to Twilio")
-        else:
-            print("WARNING: Cannot clear Twilio buffer because StreamSid is None!")
+            # print("Sent clear event to Twilio")
         
         # Cancel the current OpenAI response if one is in progress
-        # Note: Server VAD usually handles this automatically, but being explicit doesn't hurt
         if self.last_assistant_item_id:
             cancel_event = {
                 "type": "response.cancel"
             }
             await self.openai_ws.send(json.dumps(cancel_event))
-            print("Sent response.cancel to OpenAI")
+            # print("Sent response.cancel to OpenAI")
+
+    async def send_filler_audio(self):
+        """
+        Send a 'typing sound' or 'filler phrase' to Twilio to mask RAG latency.
+        TODO: Replace with actual base64 audio of 'Let me check that...' + typing sounds.
+        """
+        if not self.stream_sid:
+            return
+
+        # Ideally, load this from a file or config
+        # For now, we will print a log placeholder. 
+        # To make this real, you would do:
+        # await self.websocket.send_json({
+        #     "event": "media",
+        #     "streamSid": self.stream_sid,
+        #     "media": {"payload": "BASE64_AUDIO_STRING"}
+        # })
+        print(">> PLAYING FILLER AUDIO: 'Let me look that up for you...' [Typing Sounds] <<")
 
     async def receive_from_twilio(self):
         """Receive audio from Twilio and send to OpenAI."""
@@ -105,6 +120,9 @@ class VoiceEventHandler:
     async def receive_from_openai(self):
         """Receive audio from OpenAI and send to Twilio."""
         audio_chunks_received = 0
+        from app.services.rag_client import RagClient
+        rag_client = RagClient()
+
         try:
             async for message in self.openai_ws:
                 data = json.loads(message)
@@ -138,8 +156,43 @@ class VoiceEventHandler:
                             }
                         }
                         await self.websocket.send_json(audio_payload)
-                    elif not self.stream_sid:
-                        print("WARNING: Received audio from OpenAI but StreamSid is missing!")
+
+                elif event_type == "response.function_call_arguments.done":
+                    # --- VOICE RAG LOGIC ---
+                    print(f"Function Call Detected: {data}")
+                    call_id = data.get("call_id")
+                    args = json.loads(data.get("arguments", "{}"))
+                    name = data.get("name") # Usually not in this event, checking implicit or previous
+                    
+                    # Note: Ideally we check the tool name. 
+                    # But if we only have one tool, we can assume or check logic.
+                    # The event structure usually implies specific detection.
+                    
+                    if "query" in args:
+                        query = args["query"]
+                        
+                        # 1. MASK LATENCY
+                        await self.send_filler_audio()
+                        
+                        # 2. QUERY RAG
+                        print(f"Voice executing RAG Query: {query}")
+                        rag_answer = await rag_client.query(query)
+                        print(f"Voice RAG Result: {rag_answer[:50]}...")
+                        
+                        # 3. SEND OUTPUT BACK
+                        await self.openai_ws.send(json.dumps({
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "function_call_output",
+                                "call_id": call_id,
+                                "output": str(rag_answer) # Ensure string
+                            }
+                        }))
+                        
+                        # 4. TRIGGER RESPONSE
+                        await self.openai_ws.send(json.dumps({
+                            "type": "response.create"
+                        }))
                 
                 elif event_type == "conversation.item.created":
                     # Track assistant response items for cancellation
@@ -148,7 +201,6 @@ class VoiceEventHandler:
                         self.last_assistant_item_id = item.get("id")
                         
                 elif event_type == "response.audio.done":
-                    # print(f"Audio response complete. Total chunks sent: {audio_chunks_received}")
                     audio_chunks_received = 0
                         
                 elif event_type == 'error':
