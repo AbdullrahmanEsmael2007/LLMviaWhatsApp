@@ -78,6 +78,7 @@ class RagClient:
                 print(f"RAG Raw Response: {response_text[:200]}...") # Log start of response for debug
                 
                 final_answer = ""
+                accumulated_chunks = []
                 
                 # Try to parse each line as a separate JSON object
                 for line in response_text.strip().split('\n'):
@@ -85,18 +86,28 @@ class RagClient:
                         continue
                     try:
                         data = json.loads(line)
-                        # Accumulate answer if it's streamed, or pick the final one
-                        # Common patterns: 'answer', 'message', 'delta'
-                        if "answer" in data:
+                        
+                        # PRIORITY 1: Explicit 'answer' field (usually final or complete)
+                        if "answer" in data and isinstance(data["answer"], str):
                             final_answer = data["answer"]
+                        
+                        # PRIORITY 2: 'data' field used for streaming chunks
                         elif "data" in data: 
-                            final_answer = data["data"]
+                            content = data["data"]
+                            # Only treat as chunk if it's a string (ignore dicts like 'start' event)
+                            if isinstance(content, str):
+                                accumulated_chunks.append(content)
                             
                     except json.JSONDecodeError:
                         continue
                 
+                # If we found an explicit 'answer' field, use it (it likely overrides partial chunks)
                 if final_answer:
                     return final_answer
+                
+                # Otherwise, join any accumulated string chunks
+                if accumulated_chunks:
+                    return "".join(accumulated_chunks)
                 
                 # Fallback: if single JSON parsing failed above (unlikely if loop worked), try whole body
                 try:

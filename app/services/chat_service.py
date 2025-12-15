@@ -182,7 +182,7 @@ async def get_chat_response(
                         "tool_call_id": tool_call.id,
                         "role": "tool",
                         "name": "query_knowledge_base",
-                        "content": rag_answer or "No relevant information found."
+                        "content": str(rag_answer or "No relevant information found.") # Ensure string for OpenAI
                     })
                     # Loop continues to get the final answer from GPT based on the tool output
             
